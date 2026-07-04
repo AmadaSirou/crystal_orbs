@@ -74,9 +74,27 @@ const AUDIO_SRC = {
   shoot: 'sfx1.wav',
   pop: 'sfx2.wav',
   clear: 'sfx3.wav',
-  bgm: '',
+  bgm: 'bgm.mp3',
 };
 const audio = {sfx:{}, bgm:null};
+const SOUND_BASE_VOLUME = {shoot:0.62, pop:0.72, clear:0.82};
+const SETTINGS_KEY = 'crystal-orbs-settings-v1';
+const optionHit = {
+  bgmToggle:{x:180,y:144,w:44,h:16},
+  bgmSlider:{x:74,y:170,w:122,h:12},
+  sfxToggle:{x:180,y:212,w:44,h:16},
+  sfxSlider:{x:74,y:238,w:122,h:12},
+  back:{x:84,y:286,w:88,h:18},
+};
+const menuHit = {
+  start:{x:70,y:205,w:116,h:18},
+  options:{x:70,y:230,w:116,h:18},
+};
+const optionItems = ['bgm','bgmVolume','sfx','sfxVolume','back'];
+let optionFocus = 0;
+let optionReturnState = 'title';
+
+const settings = loadSettings();
 
 // PS1っぽい少し濁った原色パレット（本体色/影/ハイライト）
 const PAL = [
@@ -92,6 +110,38 @@ const PAL = [
 let grid, ceiling, shots, state, score, level, colorsInPlay;
 let cur, nxt, angle, flying, popFx, fallFx, clearFx, tick, dropTimer, dropInterval, flashT, shakeT;
 let best = 0;
+
+function loadSettings(){
+  const defaults = {bgm:true, sfx:true, bgmVolume:0.38, sfxVolume:0.8};
+  try{
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    return {
+      bgm: typeof saved.bgm === 'boolean' ? saved.bgm : defaults.bgm,
+      sfx: typeof saved.sfx === 'boolean' ? saved.sfx : defaults.sfx,
+      bgmVolume: clampVolume(saved.bgmVolume ?? defaults.bgmVolume),
+      sfxVolume: clampVolume(saved.sfxVolume ?? defaults.sfxVolume),
+    };
+  }catch(e){
+    return defaults;
+  }
+}
+function saveSettings(){
+  try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }catch(e){}
+}
+function clampVolume(v){
+  return Math.max(0, Math.min(1, Number(v) || 0));
+}
+function setSetting(name, value){
+  if(name==='bgm' || name==='sfx') settings[name] = !!value;
+  else settings[name] = clampVolume(value);
+  applyAudioSettings();
+  saveSettings();
+}
+function applyAudioSettings(){
+  if(audio.bgm) audio.bgm.volume = settings.bgm ? settings.bgmVolume : 0;
+  if(state==='play' && settings.bgm) startBgm();
+  if(audio.bgm && !settings.bgm) audio.bgm.pause();
+}
 
 function newBubbleColor(){
   // 盤面に存在する色を優先して出す（詰み防止・序盤の気持ちよさ重視）
@@ -313,17 +363,17 @@ function makeAudio(name, loop=false){
 }
 function playSound(name){
   const src = AUDIO_SRC[name];
-  if(!src) return;
+  if(!src || !settings.sfx) return;
   const base = audio.sfx[name] || (audio.sfx[name] = makeAudio(name));
   if(!base) return;
   const el = base.cloneNode();
-  el.volume = name==='clear' ? 0.82 : name==='pop' ? 0.72 : 0.62;
+  el.volume = (SOUND_BASE_VOLUME[name] || 0.7) * settings.sfxVolume;
   el.play().catch(()=>{});
 }
 function startBgm(){
-  if(!AUDIO_SRC.bgm) return;
+  if(!AUDIO_SRC.bgm || !settings.bgm) return;
   if(!audio.bgm) audio.bgm = makeAudio('bgm', true);
-  audio.bgm.volume = 0.38;
+  audio.bgm.volume = settings.bgmVolume;
   audio.bgm.play().catch(()=>{});
 }
 function stopBgm(){
@@ -347,17 +397,60 @@ function aimAt(p){
   a=Math.max(-Math.PI+lim, Math.min(-lim, a));
   angle=a;
 }
+function pointIn(p, r){
+  return p.x>=r.x && p.x<=r.x+r.w && p.y>=r.y && p.y<=r.y+r.h;
+}
+function setVolumeFromPoint(name, p){
+  const r = name==='bgmVolume' ? optionHit.bgmSlider : optionHit.sfxSlider;
+  setSetting(name, (p.x-r.x)/r.w);
+}
+function openOptions(){
+  if(state==='play') return;
+  optionReturnState = state;
+  state='options';
+  optionFocus = 0;
+}
+function closeOptions(){
+  state = optionReturnState==='over' ? 'over' : 'title';
+}
+function handleOptionsPress(p){
+  if(pointIn(p, optionHit.bgmToggle)){ setSetting('bgm', !settings.bgm); return; }
+  if(pointIn(p, optionHit.bgmSlider)){ setVolumeFromPoint('bgmVolume', p); return; }
+  if(pointIn(p, optionHit.sfxToggle)){ setSetting('sfx', !settings.sfx); playSound('pop'); return; }
+  if(pointIn(p, optionHit.sfxSlider)){ setVolumeFromPoint('sfxVolume', p); playSound('pop'); return; }
+  if(pointIn(p, optionHit.back)){ closeOptions(); return; }
+}
+function optionActivate(){
+  const item = optionItems[optionFocus];
+  if(item==='bgm') setSetting('bgm', !settings.bgm);
+  if(item==='sfx'){ setSetting('sfx', !settings.sfx); playSound('pop'); }
+  if(item==='back') closeOptions();
+}
+function adjustOption(delta){
+  const item = optionItems[optionFocus];
+  if(item==='bgmVolume') setSetting('bgmVolume', settings.bgmVolume + delta);
+  if(item==='sfxVolume'){ setSetting('sfxVolume', settings.sfxVolume + delta); playSound('pop'); }
+}
 cv.addEventListener('mousemove',e=>{ if(state==='play') aimAt(toLocal(e)); });
 cv.addEventListener('mousedown',e=>{ handlePress(toLocal(e)); });
 cv.addEventListener('touchstart',e=>{ e.preventDefault(); const p=toLocal(e); if(state==='play') aimAt(p); handlePressTouch(p); },{passive:false});
 cv.addEventListener('touchmove',e=>{ e.preventDefault(); if(state==='play') aimAt(toLocal(e)); },{passive:false});
 cv.addEventListener('touchend',e=>{ e.preventDefault(); if(state==='play') shoot(); },{passive:false});
 function handlePress(p){
-  if(state==='title'||state==='over'){ startPlay(); return; }
+  if(state==='options'){ handleOptionsPress(p); return; }
+  if(state==='title'||state==='over'){
+    if(pointIn(p, menuHit.options)){ openOptions(); return; }
+    startPlay();
+    return;
+  }
   aimAt(p); shoot();
 }
 function handlePressTouch(p){
-  if(state==='title'||state==='over'){ startPlay(); }
+  if(state==='options'){ handleOptionsPress(p); return; }
+  if(state==='title'||state==='over'){
+    if(pointIn(p, menuHit.options)){ openOptions(); return; }
+    startPlay();
+  }
 }
 function startPlay(){
   if(state==='over') { const b=best; reset(); best=b; }
@@ -365,6 +458,20 @@ function startPlay(){
   startBgm();
 }
 window.addEventListener('keydown',e=>{
+  if(state==='options'){
+    if(e.code==='Escape'){ e.preventDefault(); closeOptions(); }
+    if(e.code==='ArrowUp'){ e.preventDefault(); optionFocus=(optionFocus+optionItems.length-1)%optionItems.length; }
+    if(e.code==='ArrowDown'){ e.preventDefault(); optionFocus=(optionFocus+1)%optionItems.length; }
+    if(e.code==='ArrowLeft'){ e.preventDefault(); adjustOption(-0.05); }
+    if(e.code==='ArrowRight'){ e.preventDefault(); adjustOption(0.05); }
+    if(e.code==='Space'||e.code==='Enter'){ e.preventDefault(); optionActivate(); }
+    return;
+  }
+  if((state==='title'||state==='over') && e.code==='KeyO'){
+    e.preventDefault();
+    openOptions();
+    return;
+  }
   if(e.code==='Space'||e.code==='Enter'){
     e.preventDefault();
     if(state!=='play') startPlay(); else shoot();
@@ -541,6 +648,79 @@ function drawCenterText(lines){
   }
   ctx.textAlign='left';
 }
+function drawButton(r, label, active=false){
+  ctx.fillStyle = active ? '#ffcc33' : '#202040';
+  ctx.fillRect(r.x,r.y,r.w,r.h);
+  ctx.strokeStyle = active ? '#fff0a0' : '#55557f';
+  ctx.strokeRect(r.x+.5,r.y+.5,r.w-1,r.h-1);
+  ctx.textAlign='center';
+  ctx.font='8px monospace';
+  ctx.fillStyle = active ? '#1a1020' : '#ffffff';
+  ctx.fillText(label, r.x+r.w/2, r.y+5);
+  ctx.textAlign='left';
+}
+function drawToggle(r, on, active=false){
+  ctx.fillStyle = active ? '#ffcc33' : '#202040';
+  ctx.fillRect(r.x,r.y,r.w,r.h);
+  ctx.strokeStyle = active ? '#fff0a0' : '#55557f';
+  ctx.strokeRect(r.x+.5,r.y+.5,r.w-1,r.h-1);
+  ctx.fillStyle = on ? '#33ffcc' : '#8888aa';
+  ctx.fillRect(r.x+(on?24:4), r.y+4, 16, 8);
+  ctx.font='8px monospace';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign='center';
+  ctx.fillText(on ? 'ON' : 'OFF', r.x+r.w/2, r.y-10);
+  ctx.textAlign='left';
+}
+function drawSlider(r, value, active=false){
+  const knobX = Math.round(r.x + r.w*value);
+  ctx.fillStyle = '#101028';
+  ctx.fillRect(r.x,r.y+4,r.w,4);
+  ctx.fillStyle = active ? '#ffcc33' : '#33ffcc';
+  ctx.fillRect(r.x,r.y+4,knobX-r.x,4);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(knobX-2,r.y,4,12);
+  ctx.strokeStyle = active ? '#fff0a0' : '#55557f';
+  ctx.strokeRect(r.x-.5,r.y+3.5,r.w+1,5);
+}
+function drawMenuButtons(){
+  drawButton(menuHit.start, 'START', false);
+  drawButton(menuHit.options, 'OPTION', false);
+}
+function drawOptions(){
+  ctx.fillStyle='rgba(0,0,20,.86)'; ctx.fillRect(20,66,IW-40,252);
+  ctx.strokeStyle='#55557f'; ctx.lineWidth=1; ctx.strokeRect(20.5,66.5,IW-41,251);
+  ctx.textAlign='center';
+  ctx.font='14px monospace';
+  ctx.fillStyle='#ffcc33';
+  ctx.fillText('OPTION', IW/2, 84);
+  ctx.textAlign='left';
+  ctx.font='9px monospace';
+  ctx.fillStyle='#ffffff';
+  ctx.fillText('BGM', 40, 145);
+  drawToggle(optionHit.bgmToggle, settings.bgm, optionFocus===0);
+  ctx.fillStyle='#8888aa';
+  ctx.fillText('VOLUME '+Math.round(settings.bgmVolume*100).toString().padStart(3,' ')+'%', 40, 164);
+  drawSlider(optionHit.bgmSlider, settings.bgmVolume, optionFocus===1);
+  if(!AUDIO_SRC.bgm){
+    ctx.fillStyle='#777799';
+    ctx.font='8px monospace';
+    ctx.fillText('BGM FILE NONE', 74, 188);
+  }
+  ctx.font='9px monospace';
+  ctx.fillStyle='#ffffff';
+  ctx.fillText('SFX', 40, 213);
+  drawToggle(optionHit.sfxToggle, settings.sfx, optionFocus===2);
+  ctx.fillStyle='#8888aa';
+  ctx.fillText('VOLUME '+Math.round(settings.sfxVolume*100).toString().padStart(3,' ')+'%', 40, 232);
+  drawSlider(optionHit.sfxSlider, settings.sfxVolume, optionFocus===3);
+  drawButton(optionHit.back, 'BACK', optionFocus===4);
+  ctx.textAlign='center';
+  ctx.font='8px monospace';
+  ctx.fillStyle='#8888aa';
+  ctx.fillText('↑↓ SELECT  ←→ VOLUME', IW/2, 332);
+  ctx.textAlign='left';
+}
 
 function loop(){
   tick++;
@@ -568,16 +748,20 @@ function loop(){
     drawCenterText([
       ['CRYSTAL ORBS','#ffcc33',14],
       ['','#fff',2],
-      [ (tick>>4)%2? 'PRESS START':'', '#fff', 10],
-      ['CLICK / SPACE','#8888aa',8],
+      [ (tick>>4)%2? 'PRESS START':'', '#fff', 9],
+      ['CLICK / SPACE / O','#8888aa',8],
     ]);
+    drawMenuButtons();
   }else if(state==='over'){
     drawCenterText([
       ['GAME OVER','#ff5577',14],
       ['SCORE '+score,'#fff',10],
       ['HI    '+best,'#ffcc33',10],
-      [ (tick>>4)%2? 'PRESS START':'', '#8888aa', 9],
+      [ (tick>>4)%2? 'PRESS START':'', '#8888aa', 8],
     ]);
+    drawMenuButtons();
+  }else if(state==='options'){
+    drawOptions();
   }
   requestAnimationFrame(loop);
 }
