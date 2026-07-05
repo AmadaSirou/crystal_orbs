@@ -40,7 +40,7 @@
       <div id="crt"></div>
     </div>
   </div>
-  <div id="hint">マウス/タッチで狙って クリックで発射　｜　← → で角度・SPACEで発射</div>
+  <div id="hint">マウス/タッチで狙って クリックで発射　｜　← → で角度・SPACEで発射　｜　Oでオプション</div>
 </div>
 <script>
 (()=>{
@@ -84,13 +84,14 @@ const optionHit = {
   bgmSlider:{x:74,y:170,w:122,h:12},
   sfxToggle:{x:180,y:212,w:44,h:16},
   sfxSlider:{x:74,y:238,w:122,h:12},
-  back:{x:84,y:286,w:88,h:18},
+  guideToggle:{x:166,y:270,w:58,h:16},
+  back:{x:84,y:306,w:88,h:18},
 };
 const menuHit = {
   start:{x:70,y:205,w:116,h:18},
   options:{x:70,y:230,w:116,h:18},
 };
-const optionItems = ['bgm','bgmVolume','sfx','sfxVolume','back'];
+const optionItems = ['bgm','bgmVolume','sfx','sfxVolume','guideLength','back'];
 let optionFocus = 0;
 let optionReturnState = 'title';
 
@@ -112,7 +113,7 @@ let cur, nxt, angle, flying, popFx, fallFx, clearFx, tick, dropTimer, dropInterv
 let best = 0;
 
 function loadSettings(){
-  const defaults = {bgm:true, sfx:true, bgmVolume:0.38, sfxVolume:0.8};
+  const defaults = {bgm:true, sfx:true, bgmVolume:0.38, sfxVolume:0.8, guideLength:'long'};
   try{
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     return {
@@ -120,6 +121,7 @@ function loadSettings(){
       sfx: typeof saved.sfx === 'boolean' ? saved.sfx : defaults.sfx,
       bgmVolume: clampVolume(saved.bgmVolume ?? defaults.bgmVolume),
       sfxVolume: clampVolume(saved.sfxVolume ?? defaults.sfxVolume),
+      guideLength: saved.guideLength === 'short' ? 'short' : defaults.guideLength,
     };
   }catch(e){
     return defaults;
@@ -133,6 +135,7 @@ function clampVolume(v){
 }
 function setSetting(name, value){
   if(name==='bgm' || name==='sfx') settings[name] = !!value;
+  else if(name==='guideLength') settings[name] = value === 'short' ? 'short' : 'long';
   else settings[name] = clampVolume(value);
   applyAudioSettings();
   saveSettings();
@@ -405,31 +408,36 @@ function setVolumeFromPoint(name, p){
   setSetting(name, (p.x-r.x)/r.w);
 }
 function openOptions(){
-  if(state==='play') return;
   optionReturnState = state;
   state='options';
   optionFocus = 0;
 }
 function closeOptions(){
-  state = optionReturnState==='over' ? 'over' : 'title';
+  state = optionReturnState==='play' ? 'play' : optionReturnState==='over' ? 'over' : 'title';
 }
 function handleOptionsPress(p){
   if(pointIn(p, optionHit.bgmToggle)){ setSetting('bgm', !settings.bgm); return; }
   if(pointIn(p, optionHit.bgmSlider)){ setVolumeFromPoint('bgmVolume', p); return; }
   if(pointIn(p, optionHit.sfxToggle)){ setSetting('sfx', !settings.sfx); playSound('pop'); return; }
   if(pointIn(p, optionHit.sfxSlider)){ setVolumeFromPoint('sfxVolume', p); playSound('pop'); return; }
+  if(pointIn(p, optionHit.guideToggle)){ toggleGuideLength(); playSound('pop'); return; }
   if(pointIn(p, optionHit.back)){ closeOptions(); return; }
+}
+function toggleGuideLength(){
+  setSetting('guideLength', settings.guideLength === 'short' ? 'long' : 'short');
 }
 function optionActivate(){
   const item = optionItems[optionFocus];
   if(item==='bgm') setSetting('bgm', !settings.bgm);
   if(item==='sfx'){ setSetting('sfx', !settings.sfx); playSound('pop'); }
+  if(item==='guideLength'){ toggleGuideLength(); playSound('pop'); }
   if(item==='back') closeOptions();
 }
 function adjustOption(delta){
   const item = optionItems[optionFocus];
   if(item==='bgmVolume') setSetting('bgmVolume', settings.bgmVolume + delta);
   if(item==='sfxVolume'){ setSetting('sfxVolume', settings.sfxVolume + delta); playSound('pop'); }
+  if(item==='guideLength'){ toggleGuideLength(); playSound('pop'); }
 }
 cv.addEventListener('mousemove',e=>{ if(state==='play') aimAt(toLocal(e)); });
 cv.addEventListener('mousedown',e=>{ handlePress(toLocal(e)); });
@@ -465,9 +473,10 @@ window.addEventListener('keydown',e=>{
     if(e.code==='ArrowLeft'){ e.preventDefault(); adjustOption(-0.05); }
     if(e.code==='ArrowRight'){ e.preventDefault(); adjustOption(0.05); }
     if(e.code==='Space'||e.code==='Enter'){ e.preventDefault(); optionActivate(); }
+    if(e.code==='KeyO'){ e.preventDefault(); closeOptions(); }
     return;
   }
-  if((state==='title'||state==='over') && e.code==='KeyO'){
+  if((state==='title'||state==='over'||state==='play') && e.code==='KeyO'){
     e.preventDefault();
     openOptions();
     return;
@@ -561,8 +570,9 @@ function drawShooter(){
   if(state==='play' && !flying){
     let gx=SHOOTER.x, gy=SHOOTER.y, ga=angle, steps=0;
     let vx=Math.cos(ga)*6, vy=Math.sin(ga)*6;
+    const maxSteps = settings.guideLength === 'short' ? 26 : 52;
     ctx.fillStyle='rgba(255,255,255,.55)';
-    while(steps<26 && gy>TOP0+R){
+    while(steps<maxSteps && gy>TOP0+R){
       gx+=vx; gy+=vy;
       if(gx<GRID_X+R||gx>GRID_X+COLS*CW-R) vx*=-1;
       if(steps%2===0) ctx.fillRect(Math.round(gx),Math.round(gy),2,2);
@@ -576,6 +586,8 @@ function drawShooter(){
   // 現在弾・次弾
   if(!flying) drawBubble(SHOOTER.x,SHOOTER.y,cur);
   ctx.font='8px monospace'; ctx.fillStyle='#8888aa';
+  ctx.fillText('CUR',16,SHOOTER.y-4);
+  drawBubble(24,SHOOTER.y+2,cur,0.8);
   ctx.fillText('NEXT',IW-52,SHOOTER.y-4);
   drawBubble(IW-24,SHOOTER.y+2,nxt,0.8);
 }
@@ -683,13 +695,24 @@ function drawSlider(r, value, active=false){
   ctx.strokeStyle = active ? '#fff0a0' : '#55557f';
   ctx.strokeRect(r.x-.5,r.y+3.5,r.w+1,5);
 }
+function drawChoice(r, label, active=false){
+  ctx.fillStyle = active ? '#ffcc33' : '#202040';
+  ctx.fillRect(r.x,r.y,r.w,r.h);
+  ctx.strokeStyle = active ? '#fff0a0' : '#55557f';
+  ctx.strokeRect(r.x+.5,r.y+.5,r.w-1,r.h-1);
+  ctx.textAlign='center';
+  ctx.font='8px monospace';
+  ctx.fillStyle = active ? '#1a1020' : '#ffffff';
+  ctx.fillText(label, r.x+r.w/2, r.y+5);
+  ctx.textAlign='left';
+}
 function drawMenuButtons(){
   drawButton(menuHit.start, 'START', false);
   drawButton(menuHit.options, 'OPTION', false);
 }
 function drawOptions(){
-  ctx.fillStyle='rgba(0,0,20,.86)'; ctx.fillRect(20,66,IW-40,252);
-  ctx.strokeStyle='#55557f'; ctx.lineWidth=1; ctx.strokeRect(20.5,66.5,IW-41,251);
+  ctx.fillStyle='rgba(0,0,20,.86)'; ctx.fillRect(20,58,IW-40,286);
+  ctx.strokeStyle='#55557f'; ctx.lineWidth=1; ctx.strokeRect(20.5,58.5,IW-41,285);
   ctx.textAlign='center';
   ctx.font='14px monospace';
   ctx.fillStyle='#ffcc33';
@@ -714,11 +737,15 @@ function drawOptions(){
   ctx.fillStyle='#8888aa';
   ctx.fillText('VOLUME '+Math.round(settings.sfxVolume*100).toString().padStart(3,' ')+'%', 40, 232);
   drawSlider(optionHit.sfxSlider, settings.sfxVolume, optionFocus===3);
-  drawButton(optionHit.back, 'BACK', optionFocus===4);
+  ctx.font='9px monospace';
+  ctx.fillStyle='#ffffff';
+  ctx.fillText('GUIDE', 40, 271);
+  drawChoice(optionHit.guideToggle, settings.guideLength === 'short' ? 'SHORT' : 'LONG', optionFocus===4);
+  drawButton(optionHit.back, 'BACK', optionFocus===5);
   ctx.textAlign='center';
   ctx.font='8px monospace';
   ctx.fillStyle='#8888aa';
-  ctx.fillText('↑↓ SELECT  ←→ VOLUME', IW/2, 332);
+  ctx.fillText('↑↓ SELECT  ←→ CHANGE  O BACK', IW/2, 358);
   ctx.textAlign='left';
 }
 
