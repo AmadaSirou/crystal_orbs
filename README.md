@@ -3,7 +3,6 @@
 ↓↓↓<br>
 <a href="https://crystalorbs.netlify.app/" target="_blank">crystal orbs</a><br>
 
-<img src="https://x.com/sirou445205/status/2073591132270043347/photo/1"><br>
 <br>
 <br>
 ## 音声差し替えれるようにした<br>
