@@ -1,4 +1,4 @@
-クリスタルが３つ揃ったら消えるパズルのやつ<br>
+ゲーセンにあるクリスタルが３つ揃ったら消えるパズルゲーム<br>
 <br>
 ↓↓↓<br>
 <a href="https://crystalorbs.netlify.app/" target="_blank">crystal orbs</a>
