@@ -3,6 +3,7 @@
 ↓↓↓<br>
 <a href="https://crystalorbs.netlify.app/" target="_blank">crystal orbs</a><br>
 
+<a href="https://crystalorbs.netlify.app/ver2.html" target="_blank">crystal orbs 漢字モード</a><br>
 <br>
 <br>
 ## 音声差し替えれるようにした<br>
