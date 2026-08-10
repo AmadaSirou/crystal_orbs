@@ -3,6 +3,8 @@
 ↓↓↓<br>
 <a href="https://crystalorbs.netlify.app/ver3.html" target="_blank">crystal orbs ver3</a><br>
 
+<img src"./crystalorbs.png">
+
 <a href="https://crystalorbs.netlify.app/ver2.html" target="_blank">crystal orbs ver2 漢字モード</a><br>
 
 <a href="https://crystalorbs.netlify.app/" target="_blank">crystal orbs</a><br>
