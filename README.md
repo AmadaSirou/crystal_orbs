@@ -1,4 +1,5 @@
 ゲーセンにあるクリスタルが３つ揃ったら消えるパズルゲーム<br>
+ストレス要素を消し、簡単にできる調整にしている。<br>
 <br>
 ↓↓↓<br>
 <a href="https://crystalorbs.netlify.app/ver3.html" target="_blank">crystal orbs ver3</a><br>
