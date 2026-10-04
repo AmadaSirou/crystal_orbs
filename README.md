@@ -2,7 +2,7 @@
 ストレス要素を消し、簡単にできる調整にしている。<br>
 <br>
 ↓↓↓<br>
-<a href="https://crystalorbs.netlify.app/ver3.html" target="_blank">crystal orbs ver4 ドパガキ専用</a><br>
+<a href="https://crystalorbs.netlify.app/ver4.html" target="_blank">crystal orbs ver4 ドパガキ専用</a><br>
 
 <img src="./crystalorbs.png">
 
