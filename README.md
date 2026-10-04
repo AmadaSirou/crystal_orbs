@@ -2,9 +2,11 @@
 ストレス要素を消し、簡単にできる調整にしている。<br>
 <br>
 ↓↓↓<br>
-<a href="https://crystalorbs.netlify.app/ver3.html" target="_blank">crystal orbs ver3</a><br>
+<a href="https://crystalorbs.netlify.app/ver3.html" target="_blank">crystal orbs ver4 ドパガキ専用</a><br>
 
 <img src="./crystalorbs.png">
+
+<a href="https://crystalorbs.netlify.app/ver3.html" target="_blank">crystal orbs ver3</a><br>
 
 <a href="https://crystalorbs.netlify.app/ver2.html" target="_blank">crystal orbs ver2 漢字モード</a><br>
 
